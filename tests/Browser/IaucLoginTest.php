@@ -85,7 +85,9 @@ class IaucLoginTest extends DuskTestCase
 
                         try {
                             $nameElement = $row->findElement(WebDriverBy::cssSelector('.col3.open-detail'));
-                            $carData['name'] = $nameElement ? mb_convert_kana(trim(preg_replace('/\s+/u', ' ', $nameElement->getText())), "askh") : '';
+                            $carData['name'] = $nameElement
+                                ? mb_convert_kana(trim(preg_replace('/\s+/u', ' ', $nameElement->getText())), "askh")
+                                : '';
                             $carData['name'] = preg_replace('/[^\x20-\x7E]/u', '', $carData['name']);
                         } catch (\Exception $e) {
                             $carData['name'] = '';
@@ -95,7 +97,9 @@ class IaucLoginTest extends DuskTestCase
                         if ($nextRow && strpos($nextRow->getAttribute('class'), 'line-auction') !== false) {
                             try {
                                 $yearElement = $nextRow->findElement(WebDriverBy::cssSelector('.col5.open-detail p:first-child'));
-                                $carData['year'] = $yearElement ? mb_convert_kana(trim($yearElement->getText()), "askh") : '';
+                                $carData['year'] = $yearElement
+                                    ? mb_convert_kana(trim($yearElement->getText()), "askh")
+                                    : '';
                             } catch (\Exception $e) {
                                 $carData['year'] = '';
                             }
@@ -133,10 +137,26 @@ class IaucLoginTest extends DuskTestCase
                 $nextButton = $browser->element('#pager-link-next');
                 if ($nextButton) {
                     $browser->click('#pager-link-next');
-                    Sleep::for(3)->seconds();
+
+                    // Optionally, wait until the loading element is visible (display:block)
+                    $browser->waitUsing(10, 500, function () use ($browser) {
+                        $display = $browser->script(
+                            'return window.getComputedStyle(document.getElementById("loading")).display;'
+                        )[0];
+                        return $display === 'block';
+                    });
+
+                    // Now wait until the loading element is hidden (display:none)
+                    $browser->waitUsing(30, 500, function () use ($browser) {
+                        $display = $browser->script(
+                            'return window.getComputedStyle(document.getElementById("loading")).display;'
+                        )[0];
+                        return $display === 'none';
+                    });
                 }
 
             } while ($nextButton);
+
 
         });
 
