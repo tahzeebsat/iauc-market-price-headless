@@ -26,7 +26,7 @@ class IaucLoginTest extends DuskTestCase
                 ->first();
 
             if(!$scrapping_model) {
-                Log::info('Model not found for iauc market price scrapping.');
+                Log::info('Model not found for iauc market price scrapping, may be all models scrapped already.');
                 return;
             }
 
