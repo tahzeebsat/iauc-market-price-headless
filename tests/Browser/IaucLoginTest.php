@@ -2,6 +2,8 @@
 
 namespace Tests\Browser;
 
+use App\Models\IaucMarketPriceLog;
+use App\Models\IaucModel;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -12,9 +14,22 @@ use Facebook\WebDriver\WebDriverBy;
 
 class IaucLoginTest extends DuskTestCase
 {
-    public function testLogin(): void
+    public function testIaucMarketPrice(): void
     {
         $this->browse(function (Browser $browser) {
+
+            /* Select make and model */
+            $scrapping_model = IaucModel::leftJoin('iauc_market_price_logs', 'iauc_models.id', '=', 'iauc_market_price_logs.model_id')
+                ->join('iauc_makes', 'iauc_models.iauc_make_id', '=', 'iauc_makes.id')
+                ->whereNull('iauc_market_price_logs.id')
+                ->select(['iauc_models.id as model_id', 'iauc_makes.name as make_name', 'iauc_makes.sat_name as sat_name', 'iauc_models.name as model_name', 'iauc_models.sat_name as iauc_model'])
+                ->first();
+
+            if(!$scrapping_model) {
+                Log::info('Model not found for iauc market price scrapping.');
+                return;
+            }
+
             $browser->script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
             $browser->visit('https://www.iauc.co.jp/');
             $browser->assertSee('適格請求書発行事業者登録完了のお知らせ');
@@ -47,7 +62,9 @@ class IaucLoginTest extends DuskTestCase
             $browser->assertSee('※select multiple Make & Model');
             $browser->select('#searchPeriod', '12');
 
-            $make = 'TOYOTA';
+            $make = $scrapping_model->make_name;
+            $model = $scrapping_model->model_name;
+            $model_id = $scrapping_model->model_id;
 
             // Select Make dynamically
             $makeElements = $browser->elements('.search-maker-right');
@@ -61,7 +78,7 @@ class IaucLoginTest extends DuskTestCase
             // Select Model dynamically
             $modelElements = $browser->elements('#vehicle.search-page div#box-type ul li div + div span');
             foreach ($modelElements as $element) {
-                if (trim($element->getText()) === "86") {
+                if (trim($element->getText()) === $model) {
                     $element->click();
                     break;
                 }
@@ -124,14 +141,11 @@ class IaucLoginTest extends DuskTestCase
                     }
                 }
 
-                Log::info('Scraped Car Data:', $cars);
-
                 if (!empty($cars)) {
-                    $response = Http::post('http://sat.local/api/iauc/submit-market-price-request', [
+                    $response = Http::post(config('app.remote_api_url').'/api/iauc/submit-market-price-request', [
                         'data' => $cars,
                         'make' => $make
                     ]);
-                    Log::info('API Response:', $response->json());
                 }
 
                 $nextButton = $browser->element('#pager-link-next');
@@ -155,7 +169,26 @@ class IaucLoginTest extends DuskTestCase
                     });
                 }
 
+                IaucMarketPriceLog::updateOrCreate(
+                    [
+                        'model_id' => $model_id,
+                    ],
+                    [
+                        'status' => 'processing'
+                    ]
+                );
+
+
             } while ($nextButton);
+
+            IaucMarketPriceLog::updateOrCreate(
+                [
+                    'model_id' => $model_id,
+                ],
+                [
+                    'status' => 'success'
+                ]
+            );
 
 
         });

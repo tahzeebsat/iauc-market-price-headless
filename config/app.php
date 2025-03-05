@@ -5,6 +5,8 @@ use Illuminate\Support\ServiceProvider;
 
 return [
 
+    'remote_api_url' => env('REMOTE_API_URL', 'http://sat.local'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Name
